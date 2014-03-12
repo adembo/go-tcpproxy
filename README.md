@@ -1,6 +1,7 @@
-This is a super simple TCP proxy.
+### This is a super simple TCP proxy.
 
 It takes three arguments:
+
 1. The local TCP port to listen on.
 2. The remote hostname or IP address to connect to.
 3. The remote TCP port to connect to.
