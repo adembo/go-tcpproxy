@@ -46,14 +46,14 @@ func main() {
 	check_err(err, "Error in listen: %s\n")
 	log("Listening on %s\n", local_hostport)
 	for {
-		// Spawn a connection for each inbound connection.
+		// Each inbound connection is handled in its own goroutine.
 		conn, err := ln.AcceptTCP()
 		check_err(err, "Error in accept: %s\n")
 		go handle_connection(raddr, conn)
 	}
 }
 
-// Service a client.
+// Service one client<->proxy<->server connection.
 func handle_connection(raddr *net.TCPAddr, in *net.TCPConn) {
 	log("Accepted a connection from %s\n", in.RemoteAddr().String())
 
@@ -72,7 +72,7 @@ func handle_connection(raddr *net.TCPAddr, in *net.TCPConn) {
 	log("Done with connection: %d bytes written\n", total)
 }
 
-// Service one half of the connection (either client<->proxy or proxy<->remote)
+// Service one half of the connection (either client<->proxy or proxy<->remote).
 func handle_io(c chan int64, first, second *net.TCPConn) {
 	var total int64
 	for {
