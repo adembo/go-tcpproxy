@@ -17,28 +17,41 @@ func main() {
 	server_host := os.Args[2]
 	server_port := os.Args[3]
 
-	hostport := net.JoinHostPort("", listen_port)
-	ln, err := net.Listen("tcp", hostport)
+	local_hostport := net.JoinHostPort("", listen_port)
+	remote_hostport := net.JoinHostPort(server_host, server_port)
+
+	laddr, err := net.ResolveTCPAddr("tcp", local_hostport)
+	if err != nil {
+		fmt.Printf("Error in resolve local: %s\n", err.Error())
+		return
+	}
+	raddr, err := net.ResolveTCPAddr("tcp", remote_hostport)
+	if err != nil {
+		fmt.Printf("Error in resolve remote: %s\n", err.Error())
+		return
+	}
+
+	ln, err := net.ListenTCP("tcp", laddr)
 	if err != nil {
 		fmt.Printf("Error in listen: %s\n", err.Error())
 		return
 	}
-	fmt.Printf("Listening on %s\n", hostport)
+	fmt.Printf("Listening on %s\n", local_hostport)
 	for {
-		conn, err := ln.Accept()
+		conn, err := ln.AcceptTCP()
 		if err != nil {
 			fmt.Printf("Error in accept: %s\n", err.Error())
 			continue
 		}
-		go handle_connection(server_host, server_port, conn)
+		go handle_connection(raddr, conn)
 	}
 }
 
-func handle_connection(server_host, server_port string, in net.Conn) {
+func handle_connection(raddr *net.TCPAddr, in *net.TCPConn) {
 	fmt.Printf("Accepted a connection\n")
 
 	// Connect to remote host.
-	out, err := net.Dial("tcp", net.JoinHostPort(server_host, server_port))
+	out, err := net.DialTCP("tcp", nil, raddr)
 	if err != nil {
 		fmt.Printf("Error in dial: %s\n", err.Error())
 		in.Close()
@@ -52,14 +65,10 @@ func handle_connection(server_host, server_port string, in net.Conn) {
 	go handle_io(ch2, out, in)
 	total := <-ch1
 	<-ch2
-
-	// Close everything.
-	out.Close()
-	in.Close()
 	fmt.Printf("Done with connection: %d bytes written\n", total)
 }
 
-func handle_io(c chan int64, first, second net.Conn) {
+func handle_io(c chan int64, first, second *net.TCPConn) {
 	var total int64
 	for {
 		bytes, err := io.Copy(first, second)
@@ -68,6 +77,8 @@ func handle_io(c chan int64, first, second net.Conn) {
 			break
 		}
 		if bytes == 0 {
+			second.CloseRead()
+			first.CloseWrite()
 			break
 		}
 		total += bytes
